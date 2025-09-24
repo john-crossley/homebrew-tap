@@ -1,5 +1,5 @@
 class Tusk < Formula
-  desc "Tusk is a simple daily todo manager for your terminal"
+  desc "Simple terminal based daily todo manager."
   homepage "https://github.com/john-crossley/tusk"
   url "https://github.com/john-crossley/tusk/archive/refs/tags/v0.1.1.tar.gz"
   sha256 "9e37bc5f94a51345881f74da411e1d16b96dc04a3717de9ae0c8f44e7c611022"
