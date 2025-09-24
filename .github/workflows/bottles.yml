@@ -32,7 +32,14 @@ jobs:
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          brew test-bot --only-formulae --skip-online-checks --tap="${{ github.repository }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            brew test-bot --only-formulae --skip-online-checks \
+              --tap="${{ github.repository }}" \
+              --testing-formulae ${{ inputs.formulae }}
+          else
+            brew test-bot --only-formulae --skip-online-checks \
+              --tap="${{ github.repository }}"
+          fi
 
       - name: Upload bottle artifacts
         uses: actions/upload-artifact@v4
