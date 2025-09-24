@@ -45,22 +45,33 @@ jobs:
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euxo pipefail
+          set -euo pipefail
 
           TAP="${{ github.repository }}"
           TAP_DIR="$(brew --repository "$TAP")"
-          echo "Tap dir: $TAP_DIR"
+          echo "PWD=$(pwd)"
+          echo "TAP_DIR=$TAP_DIR"
 
-          # Copy generated bottle files into the tap repo root
           shopt -s nullglob
-          for f in *.bottle.json *.bottle.tar.gz; do
-            cp "$f" "$TAP_DIR"/
-          done
 
-          echo "Files now in tap repo:"
-          ls -lah "$TAP_DIR"/*.bottle.*
+          # If bottle files exist in PWD and we're not already in TAP_DIR, copy them across.
+          FILES=( *.bottle.json *.bottle.tar.gz )
+          if [[ ${#FILES[@]} -gt 0 ]]; then
+            if [[ "$(realpath .)" != "$(realpath "$TAP_DIR")" ]]; then
+              for f in "${FILES[@]}"; do
+                cp -f "$f" "$TAP_DIR"/
+              done
+            else
+              echo "Bottle files are already in the tap directory."
+            fi
+          else
+            echo "No bottles in PWD; assuming test-bot wrote them directly to the tap."
+          fi
 
-          # Run pr-upload inside the tap repo so it can modify Formula/tusk.rb and push
+          echo "Tap now contains:"
+          ls -lah "$TAP_DIR"/*.bottle.* || { echo "No bottle files found"; exit 1; }
+
+          # Run pr-upload INSIDE the tap so it edits Formula/tusk.rb and pushes the commit.
           pushd "$TAP_DIR"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
