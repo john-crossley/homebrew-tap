@@ -56,12 +56,22 @@ jobs:
   publish:
     needs: bottles
     runs-on: ubuntu-latest
-
     steps:
-      - name: Download all bottle artifacts
+      - name: Checkout tap
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download bottle artifacts
         uses: actions/download-artifact@v4
         with:
           path: bottles
+
+      - name: Move bottles to CWD for pr-upload
+        run: |
+          shopt -s globstar nullglob
+          cp bottles/**/*.json .
+          cp bottles/**/*.tar.gz .
 
       - name: Set up Homebrew (for pr-upload)
         uses: Homebrew/actions/setup-homebrew@master
@@ -70,4 +80,4 @@ jobs:
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          brew pr-upload bottles/**/*
+          brew pr-upload
