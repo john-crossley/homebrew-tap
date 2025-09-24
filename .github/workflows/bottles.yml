@@ -1,11 +1,10 @@
-
 name: Build & Upload Bottles
 
 on:
   push:
     branches: [ "main" ]
-    paths: [ "Formula/*.rb" ]   
-  workflow_dispatch:            
+    paths: [ "Formula/*.rb" ]
+  workflow_dispatch:
     inputs:
       formulae:
         description: "Formulae to build (space-separated)"
@@ -13,17 +12,12 @@ on:
         default: "tusk"
 
 permissions:
-  contents: write        
-  pull-requests: write   
+  contents: write
+  pull-requests: write
 
 jobs:
-  bottles:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ macos-14 ]        
-    runs-on: ${{ matrix.os }}
-
+  bottle_and_publish:
+    runs-on: macos-14
     steps:
       - name: Checkout tap
         uses: actions/checkout@v4
@@ -33,67 +27,25 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@master
 
-      - name: Build bottles with test-bot
+      - name: Build bottle(s) with test-bot
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             brew test-bot --only-formulae --skip-online-checks \
               --tap="${{ github.repository }}" \
               --testing-formulae "${{ inputs.formulae }}"
           else
-            
             brew test-bot --only-formulae --skip-online-checks \
               --tap="${{ github.repository }}"
           fi
 
-      - name: Upload bottle artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: bottles-${{ matrix.os }}
-          path: |
-            *.json
-            *.tar.gz
-
-  publish:
-    needs: bottles
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout tap
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download bottle artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: bottles
-
-      - name: Show downloaded files
-        run: |
-          echo "Downloaded artifacts:"
-          ls -Rlah bottles || true
-
-      - name: Move bottles into CWD for pr-upload
-        shell: bash
-        run: |
-          set -euxo pipefail
-          shopt -s globstar nullglob
-          mapfile -t FILES < <(find bottles -type f \( -name '*.json' -o -name '*.tar.gz' \))
-          if [ "${#FILES[@]}" -eq 0 ]; then
-            echo "No bottle files found under ./bottles"; exit 1
-          fi
-          printf 'Found files:\n%s\n' "${FILES[@]}"
-          cp "${FILES[@]}" .
-
-      - name: Set up Homebrew (for pr-upload)
-        uses: Homebrew/actions/setup-homebrew@master
+      - name: Show generated bottle files
+        run: ls -lah *.bottle.* || true
 
       - name: Upload bottles to Release & open PR to update formula
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ls -lah
-          
+          # pr-upload expects *.bottle.json + *.tar.gz in CWD (they are, from test-bot).
           brew pr-upload
