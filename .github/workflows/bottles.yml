@@ -18,6 +18,7 @@ permissions:
 jobs:
   bottle_and_publish:
     runs-on: macos-14
+
     steps:
       - name: Checkout tap
         uses: actions/checkout@v4
@@ -27,7 +28,7 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@master
 
-      - name: Build bottle(s) with test-bot
+      - name: Build bottle(s)
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -40,12 +41,28 @@ jobs:
               --tap="${{ github.repository }}"
           fi
 
-      - name: Show generated bottle files
-        run: ls -lah *.bottle.* || true
-
-      - name: Upload bottles to Release & open PR to update formula
+      - name: Upload bottles (commit + push update)
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # pr-upload expects *.bottle.json + *.tar.gz in CWD (they are, from test-bot).
+          set -euxo pipefail
+
+          TAP="${{ github.repository }}"
+          TAP_DIR="$(brew --repository "$TAP")"
+          echo "Tap dir: $TAP_DIR"
+
+          # Copy generated bottle files into the tap repo root
+          shopt -s nullglob
+          for f in *.bottle.json *.bottle.tar.gz; do
+            cp "$f" "$TAP_DIR"/
+          done
+
+          echo "Files now in tap repo:"
+          ls -lah "$TAP_DIR"/*.bottle.*
+
+          # Run pr-upload inside the tap repo so it can modify Formula/tusk.rb and push
+          pushd "$TAP_DIR"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           brew pr-upload
+          popd
