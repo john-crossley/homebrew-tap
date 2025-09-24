@@ -1,10 +1,11 @@
+
 name: Build & Upload Bottles
 
 on:
   push:
     branches: [ "main" ]
-    paths: [ "Formula/*.rb" ]
-  workflow_dispatch:
+    paths: [ "Formula/*.rb" ]   
+  workflow_dispatch:            
     inputs:
       formulae:
         description: "Formulae to build (space-separated)"
@@ -12,15 +13,15 @@ on:
         default: "tusk"
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: write        
+  pull-requests: write   
 
 jobs:
   bottles:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14]  # arm64 bottle
+        os: [ macos-14 ]        
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -36,11 +37,13 @@ jobs:
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             brew test-bot --only-formulae --skip-online-checks \
               --tap="${{ github.repository }}" \
               --testing-formulae "${{ inputs.formulae }}"
           else
+            
             brew test-bot --only-formulae --skip-online-checks \
               --tap="${{ github.repository }}"
           fi
@@ -67,11 +70,22 @@ jobs:
         with:
           path: bottles
 
-      - name: Move bottles to CWD for pr-upload
+      - name: Show downloaded files
         run: |
+          echo "Downloaded artifacts:"
+          ls -Rlah bottles || true
+
+      - name: Move bottles into CWD for pr-upload
+        shell: bash
+        run: |
+          set -euxo pipefail
           shopt -s globstar nullglob
-          cp bottles/**/*.json .
-          cp bottles/**/*.tar.gz .
+          mapfile -t FILES < <(find bottles -type f \( -name '*.json' -o -name '*.tar.gz' \))
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "No bottle files found under ./bottles"; exit 1
+          fi
+          printf 'Found files:\n%s\n' "${FILES[@]}"
+          cp "${FILES[@]}" .
 
       - name: Set up Homebrew (for pr-upload)
         uses: Homebrew/actions/setup-homebrew@master
@@ -80,4 +94,6 @@ jobs:
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          ls -lah
+          
           brew pr-upload
