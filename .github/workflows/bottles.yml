@@ -1,0 +1,66 @@
+name: Build & Upload Bottles
+
+on:
+  # Runs whenever you bump a formula
+  push:
+    branches: [ "main" ]
+    paths:
+      - "Formula/*.rb"
+  
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bottles:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout tap
+        uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Build bottles with test-bot
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          brew tap "${{ github.repository }}" "$(pwd)"
+          brew test-bot --only-formulae --skip-online-checks
+
+      - name: Upload bottle artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bottles-${{ matrix.os }}
+          path: |
+            *.json
+            *.tar.gz
+
+  publish:
+    needs: bottles
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all bottle artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: bottles
+
+      - name: Set up Homebrew (for pr-upload)
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Upload bottles to Release & open PR to update formula
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1) Create (or reuse) a GitHub Release per formula version
+          # 2) Upload *.tar.gz + *.json bottle files to that Release
+          # 3) Open a PR adding/updating the `bottle do` block in Formula/tusk.rb
+          brew pr-upload --tap "${{ github.repository }}" bottles/**/*
