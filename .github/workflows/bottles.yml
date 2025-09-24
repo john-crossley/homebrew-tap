@@ -32,8 +32,7 @@ jobs:
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          brew tap --force-auto-update "${{ github.repository }}" "https://github.com/${{ github.repository }}"
-          brew test-bot --only-formulae --skip-online-checks
+          brew test-bot --only-formulae --skip-online-checks --tap="${{ github.repository }}"
 
       - name: Upload bottle artifacts
         uses: actions/upload-artifact@v4
