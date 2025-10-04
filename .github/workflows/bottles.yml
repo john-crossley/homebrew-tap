@@ -2,8 +2,8 @@ name: Build & Upload Bottles
 
 on:
   push:
-    branches: [ "main" ]
-    paths: [ "Formula/*.rb" ]
+    branches: ["**"]
+    paths: ["Formula/*.rb"]
   workflow_dispatch: {}
 
 permissions:
@@ -28,7 +28,7 @@ jobs:
             --tap="${{ github.repository }}" \
             --testing-formulae tusk
 
-      - name: Collect bottles and upload
+      - name: Collect bottles and update formula
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -38,38 +38,20 @@ jobs:
           TAP="${{ github.repository }}"
           TAP_DIR="$(brew --repository "$TAP")"
 
-          echo "Workspace: $(pwd)"
-          echo "Tap dir:   $TAP_DIR"
+          # Copy any bottle files into the tap checkout (POSIX-safe)
+          find . -maxdepth 3 -type f \( -name '*.bottle*.json' -o -name '*.bottle*.tar.gz' \) -print0 \
+            | xargs -0 -I{} sh -c 'cp -f "$1" "$2"/' sh {} "$TAP_DIR"
 
-          # Find bottle files wherever test-bot wrote them.
-          shopt -s globstar nullglob
-          mapfile -t FOUND < <(find . "$TAP_DIR" -maxdepth 3 -type f \( -name '*.bottle*.json' -o -name '*.bottle*.tar.gz' \))
-          if [[ ${#FOUND[@]} -eq 0 ]]; then
-            echo "No bottle files found. Dumping test-bot logs for clues:"
-            ls -lah
-            ls -lah "$TAP_DIR" || true
-            echo "---- steps_output.txt ----";    cat steps_output.txt || true
-            echo "---- bottle_output.txt ----";   cat bottle_output.txt || true
-            echo "---- linkage_output.txt ----";  cat linkage_output.txt || true
-            echo "---- skipped_or_failed* ----";  cat skipped_or_failed_formulae-*.txt || true
-            exit 1
-          fi
+          ls -lah "$TAP_DIR"/*.bottle.* || { echo "No bottle files found"; exit 1; }
 
-          echo "Found bottle files:"
-          printf ' - %s\n' "${FOUND[@]}"
-
-          # Ensure files are in the tap root (where pr-upload expects them).
-          for f in "${FOUND[@]}"; do
-            cp -f "$f" "$TAP_DIR"/
-          done
-
-          echo "Tap now contains:"
-          ls -lah "$TAP_DIR"/*.bottle.*
-
-          pushd "$TAP_DIR"
+          cd "$TAP_DIR"
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+
+          # Insert/refresh bottle block and commit
           brew pr-upload
-          git push origin HEAD:main
-          popd
+
+          # Push back to the same branch that triggered the workflow
+          branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          git push origin HEAD:"$branch"
