@@ -17,9 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: Homebrew/actions/setup-homebrew@master
-
       - name: Build bottle(s) for tusk
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -27,31 +25,24 @@ jobs:
           brew test-bot --only-formulae --skip-online-checks \
             --tap="${{ github.repository }}" \
             --testing-formulae tusk
-
-      - name: Collect bottles and update formula
+      - name: Update formula with bottle and push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-
           TAP="${{ github.repository }}"
           TAP_DIR="$(brew --repository "$TAP")"
-
-          # Copy any bottle files into the tap checkout (POSIX-safe)
-          find . -maxdepth 3 -type f \( -name '*.bottle*.json' -o -name '*.bottle*.tar.gz' \) -print0 \
-            | xargs -0 -I{} sh -c 'cp -f "$1" "$2"/' sh {} "$TAP_DIR"
-
-          ls -lah "$TAP_DIR"/*.bottle.* || { echo "No bottle files found"; exit 1; }
-
+          have_files=0
+          ls -1 *.bottle*.json *.bottle*.tar.gz >/dev/null 2>&1 && have_files=1 || true
+          if [ $have_files -eq 0 ]; then
+            ls -1 "$TAP_DIR"/*.bottle*.json "$TAP_DIR"/*.bottle*.tar.gz >/dev/null 2>&1 && have_files=1 || true
+          fi
+          [ $have_files -eq 1 ] || { echo "No bottle files found"; exit 1; }
           cd "$TAP_DIR"
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
-
-          # Insert/refresh bottle block and commit
           brew pr-upload
-
-          # Push back to the same branch that triggered the workflow
           branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           git push origin HEAD:"$branch"
