@@ -8,8 +8,8 @@ class Tusk < Formula
 
   bottle do
     root_url "https://github.com/john-crossley/homebrew-tap/releases/download/tusk-0.1.2"
-    rebuild 1
-    sha256 cellar: :any_skip_relocation, arm64_sonoma: "beb74eab8f52d3ca0df196bf4f3106fe4419066cace3338374dd978da67b444d"
+    rebuild 2
+    sha256 cellar: :any_skip_relocation, arm64_sonoma: "4f9e43480791dc120172a9d6685359014f4525d0a2baae1768e5619f5d87e457"
   end
 
   depends_on "rust" => :build
