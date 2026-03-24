@@ -18,13 +18,23 @@ jobs:
         with:
           fetch-depth: 0
       - uses: Homebrew/actions/setup-homebrew@master
-      - name: Build bottle(s) for tusk
+      - name: Build bottle(s)
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            FORMULAE="$(find Formula -name '*.rb' -exec basename {} .rb \; | sort | tr '\n' ' ')"
+          else
+            FORMULAE="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- 'Formula/*.rb' \
+              | sed -E 's#^Formula/##; s#\.rb$##' \
+              | sort -u \
+              | tr '\n' ' ')"
+          fi
+          [ -n "$FORMULAE" ] || { echo "No formula changes detected"; exit 0; }
+          echo "Building bottles for: $FORMULAE"
           brew test-bot --only-formulae --skip-online-checks \
             --tap="${{ github.repository }}" \
-            --testing-formulae tusk
+            --testing-formulae $FORMULAE
       - name: Update formula with bottle and push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
