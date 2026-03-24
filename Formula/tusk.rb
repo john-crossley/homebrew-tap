@@ -13,6 +13,7 @@ class Tusk < Formula
   end
 
   depends_on "rust" => :build
+  conflicts_with "tusk-beta", because: "both install a tusk binary"
 
   def install
     system "cargo", "install", *std_cargo_args

@@ -4,7 +4,6 @@ class TuskBeta < Formula
   url "https://github.com/john-crossley/tusk.git",
     tag:      "v0.1.3-beta.1",
     revision: "8c133288b51616aae92035b0ec7ba770e574e030"
-  version "0.1.3-beta.1"
   license "MIT"
 
   depends_on "rust" => :build
